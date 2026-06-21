@@ -43,9 +43,6 @@ Dự án đã triển khai thành công 2 tính năng nâng cao (Bonus) cho hệ
   * Thêm nhãn mới tại Form tạo Asset (ô **Tags (comma separated)**, cách nhau bằng dấu phẩy).
   * Hiển thị danh sách tags trực quan dưới dạng các nhãn nhỏ (badges) đầy màu sắc trên cột **Tags** của bảng Asset.
   * Bộ lọc thông minh **Filter by Tag...** tại trang tổng quan giúp tìm kiếm nhanh các asset có nhãn tương ứng.
-* **Hướng dẫn chụp ảnh minh họa (Screenshot):**
-  * Chụp ảnh màn hình bảng danh sách Asset hiển thị các badge tags.
-  * Chụp ảnh màn hình khi gõ một từ khóa vào ô **Filter by Tag...** và bảng tự động lọc đúng dữ liệu.
 
 ### 2. Tự động quét định kỳ (Scheduled Scans)
 * **Mô tả:** Tự động lên lịch và chạy ngầm các tiến trình quét cho toàn bộ tài sản đang có trạng thái `active` mà không cần người dùng thao tác thủ công.
@@ -53,6 +50,4 @@ Dự án đã triển khai thành công 2 tính năng nâng cao (Bonus) cho hệ
   * Khi khởi động Server Go, một goroutine chạy ngầm sẽ được kích hoạt tại `main.go`: `scanSvc.StartScheduledScans(5 * time.Minute)`.
   * Cứ mỗi 5 phút, hệ thống tự động tìm các Asset `active` chưa có tiến trình quét đang chạy để tạo và đẩy các lượt quét mới vào hàng đợi (quét `dns` cho Domain, quét `ip` cho IP).
   * Nhật ký quét được lưu trữ trong DB MySQL và hiển thị tại trang **Global Scan Logs** (Tổng quan -> Scan Logs).
-* **Hướng dẫn chụp ảnh minh họa (Screenshot):**
-  * Đảm bảo có ít nhất 1 Asset ở trạng thái `active`.
-  * Sau khoảng 5 - 10 phút, chụp màn hình trang **Scan Logs** hiển thị các lượt quét tự động có mốc thời gian cách nhau đều đặn.
+
