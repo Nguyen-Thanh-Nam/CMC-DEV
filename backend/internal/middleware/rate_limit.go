@@ -18,9 +18,11 @@ type rateLimiter struct {
 // visitor chứa dữ liệu chi tiết của từng máy khách để tính toán rate limit.
 type visitor struct {
 	// lastSeen lưu mốc thời gian cuối cùng mà máy khách gửi yêu cầu lên hệ thống.
-	lastSeen time.Time
+	lastSeen    time.Time
+	// windowStart lưu mốc thời gian bắt đầu chu kỳ giới hạn hiện tại.
+	windowStart time.Time
 	// count đếm số lượng yêu cầu (requests) mà máy khách đã thực hiện trong chu kỳ hiện tại.
-	count    int
+	count       int
 }
 
 // limiter là thực thể rateLimiter duy nhất (Singleton) được khởi tạo toàn cục để kiểm soát tần suất truy cập toàn bộ hệ thống.
@@ -59,24 +61,37 @@ func cleanupVisitors() {
 // Nó nhận vào một handler và trả về một handler mới đã được bọc logic kiểm tra tần suất.
 func RateLimit(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Bỏ qua rate limit đối với endpoint health check
+		if r.URL.Path == "/health" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		ip := strings.Split(r.RemoteAddr, ":")[0]
 
 		limiter.mu.Lock()
 		v, exists := limiter.visitors[ip]
 		
 		if !exists {
-			limiter.visitors[ip] = &visitor{lastSeen: time.Now(), count: 1}
+			now := time.Now()
+			limiter.visitors[ip] = &visitor{
+				lastSeen:    now,
+				windowStart: now,
+				count:       1,
+			}
 			limiter.mu.Unlock()
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		if time.Since(v.lastSeen) > 1*time.Minute {
+		v.lastSeen = time.Now()
+
+		if time.Since(v.windowStart) > 1*time.Minute {
+			v.windowStart = time.Now()
 			v.count = 0
 		}
 		
 		v.count++
-		v.lastSeen = time.Now()
 
 		if v.count > maxReqPerMin {
 			limiter.mu.Unlock()

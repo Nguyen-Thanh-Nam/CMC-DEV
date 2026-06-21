@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"asset-api/internal/model"
@@ -37,10 +39,18 @@ func (svc *HealthService) Check(ctx context.Context) *model.HealthResponse {
 		uptime = 0
 	}
 
+	storageType := "unknown"
+	tStr := fmt.Sprintf("%T", svc.storage)
+	if strings.Contains(tStr, "mysql") {
+		storageType = "mysql"
+	} else if strings.Contains(tStr, "memory") {
+		storageType = "in-memory"
+	}
+
 	return &model.HealthResponse{
 		Status: "ok",
 		Storage: model.StorageHealth{
-			Type:       "in-memory",
+			Type:       storageType,
 			AssetCount: svc.storage.CountAll(ctx),
 		},
 		UptimeSeconds: uptime,
