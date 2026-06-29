@@ -1,0 +1,927 @@
+openapi: 3.0.3
+info:
+  title: Mini EASM API - Session 6 (Testing)
+  description: |
+    # External Attack Surface Management API
+
+    API hoàn chỉnh cho hệ thống EASM với các tính năng:
+    - ✅ Asset Management (CRUD operations)
+    - ✅ Scanning Operations (DNS, WHOIS, Subdomain, IP, Port, SSL, Tech)
+    - ✅ Scan Job Management
+    - ✅ Result Retrieval & Filtering
+    - ✅ Pagination Support
+    - 🧪 Full Unit Test Coverage
+
+    ## Scan Types:
+
+    ### 🟢 Passive Scans (Safe - No Permission Required)
+    - `dns` - DNS record queries (A, AAAA, MX, NS, TXT, CNAME)
+    - `whois` - WHOIS registration information
+    - `subdomain` - Subdomain enumeration via DNS bruteforce
+    - `cert_trans` - Certificate Transparency logs
+    - `asn` - ASN lookup
+    - `ip` - IP Geolocation and ASN lookup
+    - `all` - Run all passive scans
+
+    ### 🔴 Active Scans (⚠️ Requires Permission)
+    - `port` - Port scanning (requires authorization)
+    - `ssl` - SSL/TLS certificate probing (requires authorization)
+    - `tech` - Technology detection and banner grabbing (requires authorization)
+
+    **⚠️ LEGAL WARNING:** Active scans may be illegal without explicit permission from target owner.
+    Only scan systems you own or have written authorization to test.
+
+  version: 6.0.0
+  contact:
+    name: CMC Intern Program
+    email: intern@cmc.com.vn
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: System
+    description: Health check and system status
+  - name: Assets
+    description: Asset management (CRUD operations)
+  - name: Scanning
+    description: Scan operations and job management
+  - name: Results
+    description: Scan result retrieval
+
+paths:
+  # ============================================
+  # SYSTEM ENDPOINTS
+  # ============================================
+
+  /health:
+    get:
+      summary: Health check
+      description: Kiểm tra trạng thái service và thời gian uptime
+      operationId: healthCheck
+      tags:
+        - System
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  message:
+                    type: string
+                    example: "Mini ASM service is running"
+                  uptime_seconds:
+                    type: number
+                    example: 3600
+                    description: Uptime in seconds
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2026-03-09T10:30:00Z"
+
+  /assets:
+    post:
+      summary: Create new asset
+      description: |
+        Tạo mới một asset (domain, IP, hoặc service).
+
+        **Validation Rules:**
+        - Name: required, max 255 characters, no null bytes
+        - Type: must be "domain", "ip", or "service"
+        - Domain: valid format (e.g., example.com), no leading/trailing dots
+        - IP: valid IPv4 or IPv6 format
+        - Service: valid URL format
+
+      operationId: createAsset
+      tags:
+        - Assets
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - type
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                  example: example.com
+                  description: Tên của asset (domain, IP, hoặc URL)
+                type:
+                  type: string
+                  enum: [domain, ip, service]
+                  example: domain
+                  description: Loại asset
+            examples:
+              domain:
+                summary: Domain asset
+                value:
+                  name: example.com
+                  type: domain
+              ip:
+                summary: IP address asset
+                value:
+                  name: 192.168.1.1
+                  type: ip
+              service:
+                summary: Service/URL asset
+                value:
+                  name: https://api.example.com
+                  type: service
+      responses:
+        "201":
+          description: Asset created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Asset"
+        "400":
+          description: Invalid input (validation error)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                empty_name:
+                  summary: Empty name
+                  value:
+                    error: "name is required"
+                invalid_type:
+                  summary: Invalid type
+                  value:
+                    error: "invalid asset type: must be domain, ip, or service"
+                invalid_domain:
+                  summary: Invalid domain format
+                  value:
+                    error: "invalid domain: invalid domain format (e.g., example.com)"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    get:
+      summary: List assets with filtering and pagination
+      description: |
+        Lấy danh sách assets với các tính năng:
+        - 📋 Pagination (page, page_size)
+        - 🔍 Filtering (type, status)
+        - 🔎 Search (partial match on name)
+        - 🔄 Sorting (sort_by, sort_order)
+
+        **Query Parameters:**
+        - `page`: Page number (default: 1)
+        - `page_size`: Items per page (default: 20, max: 100)
+        - `type`: Filter by asset type (domain, ip, service)
+        - `status`: Filter by status (active, inactive)
+        - `search`: Search in asset name (case-insensitive partial match)
+        - `sort_by`: Sort field (name, type, status, created_at, updated_at)
+        - `sort_order`: Sort order (asc, desc)
+
+      operationId: listAssets
+      tags:
+        - Assets
+      parameters:
+        - name: page
+          in: query
+          description: Page number (starts from 1)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+            example: 1
+        - name: page_size
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+            example: 20
+        - name: type
+          in: query
+          description: Filter by asset type
+          schema:
+            type: string
+            enum: [domain, ip, service]
+            example: domain
+        - name: status
+          in: query
+          description: Filter by status
+          schema:
+            type: string
+            enum: [active, inactive]
+            example: active
+        - name: search
+          in: query
+          description: Search term (partial match on name)
+          schema:
+            type: string
+            example: example
+        - name: sort_by
+          in: query
+          description: Field to sort by
+          schema:
+            type: string
+            enum: [name, type, status, created_at, updated_at]
+            default: created_at
+            example: name
+        - name: sort_order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+            example: asc
+      responses:
+        "200":
+          description: Paginated list of assets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Asset"
+                  total:
+                    type: integer
+                    example: 150
+                    description: Total number of items matching filters
+                  page:
+                    type: integer
+                    example: 1
+                  page_size:
+                    type: integer
+                    example: 20
+                  total_pages:
+                    type: integer
+                    example: 8
+        "400":
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /assets/{id}:
+    get:
+      summary: Get single asset by ID
+      description: Lấy thông tin chi tiết của một asset
+      operationId: getAsset
+      tags:
+        - Assets
+      parameters:
+        - $ref: "#/components/parameters/AssetId"
+      responses:
+        "200":
+          description: Asset found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Asset"
+        "404":
+          description: Asset not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "asset not found"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    put:
+      summary: Update asset
+      description: |
+        Cập nhật thông tin của một asset.
+        Tất cả fields đều optional - chỉ cần gửi fields muốn update.
+      operationId: updateAsset
+      tags:
+        - Assets
+      parameters:
+        - $ref: "#/components/parameters/AssetId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                  example: new-example.com
+                type:
+                  type: string
+                  enum: [domain, ip, service]
+                  example: domain
+                status:
+                  type: string
+                  enum: [active, inactive]
+                  example: inactive
+            examples:
+              update_status:
+                summary: Update status only
+                value:
+                  status: inactive
+              update_all:
+                summary: Update all fields
+                value:
+                  name: updated-example.com
+                  type: domain
+                  status: active
+      responses:
+        "200":
+          description: Asset updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Asset"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Asset not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: Delete asset
+      description: Xóa một asset (soft delete hoặc hard delete tùy implementation)
+      operationId: deleteAsset
+      tags:
+        - Assets
+      parameters:
+        - $ref: "#/components/parameters/AssetId"
+      responses:
+        "204":
+          description: Asset deleted successfully (no content)
+        "404":
+          description: Asset not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ============================================
+  # SCANNING OPERATIONS
+  # ============================================
+
+  /assets/{id}/scan:
+    post:
+      summary: Start a scan job (async)
+      description: |
+        Khởi động một scan job cho asset. Scan chạy asynchronously trong background.
+
+        **Workflow:**
+        1. POST /assets/{id}/scan - Start scan (returns job_id)
+        2. GET /scan-jobs/{job_id} - Poll for status
+        3. GET /scan-jobs/{job_id}/results - Get results when completed
+
+        **Scan Types:**
+        - 🟢 `dns` - DNS record lookup (passive)
+        - 🟢 `whois` - WHOIS information (passive)
+        - 🟢 `subdomain` - Subdomain enumeration (passive)
+        - 🟢 `cert_trans` - Certificate Transparency (passive)
+        - 🟢 `asn` - ASN lookup (passive)
+        - 🟢 `ip` - IP Geolocation and ASN lookup (passive)
+        - 🟢 `all` - All passive scans
+        - 🔴 `port` - Port scanning (⚠️ requires permission)
+        - 🔴 `ssl` - SSL/TLS probing (⚠️ requires permission)
+        - 🔴 `tech` - Technology detection (⚠️ requires permission)
+
+      operationId: startScan
+      tags:
+        - Scanning
+      parameters:
+        - $ref: "#/components/parameters/AssetId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - scan_type
+              properties:
+                scan_type:
+                  $ref: "#/components/schemas/ScanType"
+            examples:
+              dns_scan:
+                summary: DNS scan
+                value:
+                  scan_type: dns
+              whois_scan:
+                summary: WHOIS scan
+                value:
+                  scan_type: whois
+              subdomain_scan:
+                summary: Subdomain enumeration
+                value:
+                  scan_type: subdomain
+              ip_scan:
+                summary: IP Geolocation scan
+                value:
+                  scan_type: ip
+              all_passive:
+                summary: All passive scans
+                value:
+                  scan_type: all
+      responses:
+        "202":
+          description: Scan job accepted (async processing started)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanJob"
+        "400":
+          description: Invalid request (invalid scan type or asset ID)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Asset not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /assets/{id}/scans:
+    get:
+      summary: List all scan jobs for an asset
+      description: |
+        Lấy danh sách tất cả scan jobs của một asset với filtering và pagination.
+
+        **Filters:**
+        - `scan_type`: Filter by scan type
+        - `status`: Filter by status
+        - `page`: Page number
+        - `page_size`: Items per page
+
+      operationId: listScanJobs
+      tags:
+        - Scanning
+      parameters:
+        - $ref: "#/components/parameters/AssetId"
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: scan_type
+          in: query
+          description: Filter by scan type
+          schema:
+            $ref: "#/components/schemas/ScanType"
+        - name: status
+          in: query
+          description: Filter by status
+          schema:
+            $ref: "#/components/schemas/ScanStatus"
+      responses:
+        "200":
+          description: Paginated list of scan jobs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedScanJobs"
+        "404":
+          description: Asset not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /scan-jobs/{id}:
+    get:
+      summary: Get scan job status
+      description: |
+        Lấy thông tin chi tiết và status của một scan job.
+
+        **Status Flow:**
+        1. `pending` - Job queued but not started
+        2. `running` - Job is executing
+        3. `completed` - Job finished successfully
+        4. `failed` - Job encountered error
+        5. `partial` - Job completed with some errors
+
+      operationId: getScanJob
+      tags:
+        - Scanning
+      parameters:
+        - $ref: "#/components/parameters/ScanJobId"
+      responses:
+        "200":
+          description: Scan job found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanJob"
+        "404":
+          description: Scan job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /scan-jobs/{id}/results:
+    get:
+      summary: Get scan job results
+      description: |
+        Lấy tất cả results của một scan job.
+
+      operationId: getScanResults
+      tags:
+        - Results
+      parameters:
+        - $ref: "#/components/parameters/ScanJobId"
+      responses:
+        "200":
+          description: Scan results retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                    format: uuid
+                  scan_type:
+                    $ref: "#/components/schemas/ScanType"
+                  results:
+                    type: array
+                    items:
+                      type: object
+        "404":
+          description: Scan job not found or no results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ============================================
+  # RESULT RETRIEVAL (Aggregated by Asset)
+  # ============================================
+
+  /assets/{id}/results:
+    get:
+      summary: Get ALL scan results for an asset
+      description: |
+        Lấy tất cả scan results của một asset.
+        Results từ tất cả scan jobs đã chạy.
+
+      operationId: getAssetAllResults
+      tags:
+        - Results
+      parameters:
+        - $ref: "#/components/parameters/AssetId"
+      responses:
+        "200":
+          description: All results retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        "404":
+          description: Asset not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /assets/{id}/subdomains:
+    get:
+      summary: Get subdomains for an asset
+      description: Lấy danh sách tất cả subdomains đã discovered cho asset.
+
+      operationId: getAssetSubdomains
+      tags:
+        - Results
+      parameters:
+        - $ref: "#/components/parameters/AssetId"
+      responses:
+        "200":
+          description: Subdomains retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        "404":
+          description: Asset not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /assets/{id}/dns:
+    get:
+      summary: Get DNS records for an asset
+      description: Lấy danh sách tất cả DNS records cho asset.
+
+      operationId: getAssetDNS
+      tags:
+        - Results
+      parameters:
+        - $ref: "#/components/parameters/AssetId"
+      responses:
+        "200":
+          description: DNS records retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        "404":
+          description: Asset not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /assets/{id}/whois:
+    get:
+      summary: Get WHOIS record for an asset
+      description: Lấy WHOIS information cho asset.
+
+      operationId: getAssetWHOIS
+      tags:
+        - Results
+      parameters:
+        - $ref: "#/components/parameters/AssetId"
+      responses:
+        "200":
+          description: WHOIS record retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        "404":
+          description: Asset not found or no WHOIS data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+# ============================================
+# REUSABLE COMPONENTS
+# ============================================
+
+components:
+  parameters:
+    AssetId:
+      name: id
+      in: path
+      required: true
+      description: Asset UUID
+      schema:
+        type: string
+        format: uuid
+        example: "123e4567-e89b-12d3-a456-426614174000"
+
+    ScanJobId:
+      name: id
+      in: path
+      required: true
+      description: Scan job UUID
+      schema:
+        type: string
+        format: uuid
+        example: "987e6543-e21b-34c5-d678-426614174999"
+
+    Page:
+      name: page
+      in: query
+      description: Page number (starts from 1)
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    PageSize:
+      name: page_size
+      in: query
+      description: Items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  schemas:
+    # ============================================
+    # CORE ENTITIES
+    # ============================================
+
+    Asset:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        name:
+          type: string
+          example: example.com
+          description: Asset name (domain, IP, or URL)
+        type:
+          type: string
+          example: domain
+        status:
+          type: string
+          example: active
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-03-09T10:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-03-09T10:30:00Z"
+
+    ScanJob:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "987e6543-e21b-34c5-d678-426614174999"
+        asset_id:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        scan_type:
+          $ref: "#/components/schemas/ScanType"
+        status:
+          $ref: "#/components/schemas/ScanStatus"
+        started_at:
+          type: string
+          format: date-time
+          example: "2026-03-09T10:00:00Z"
+        ended_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-03-09T10:00:15Z"
+        error:
+          type: string
+          example: ""
+          description: Error message if failed
+        results_count:
+          type: integer
+          example: 25
+          description: Number of results found
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-03-09T10:00:00Z"
+
+    # ============================================
+    # ENUMS
+    # ============================================
+
+    ScanType:
+      type: string
+      enum:
+        - all
+        - dns
+        - whois
+        - subdomain
+        - cert_trans
+        - asn
+        - port
+        - ssl
+        - ip
+        - tech
+      example: dns
+      description: |
+        Scan types:
+        - `all`: Run all passive scans
+        - `dns`: DNS record lookup (passive)
+        - `whois`: WHOIS information (passive)
+        - `subdomain`: Subdomain enumeration (passive)
+        - `cert_trans`: Certificate Transparency logs (passive)
+        - `asn`: ASN lookup (passive)
+        - `ip`: IP Geolocation and ASN lookup (passive)
+        - `port`: Port scanning (⚠️ active - requires permission)
+        - `ssl`: SSL/TLS probing (⚠️ active - requires permission)
+        - `tech`: Web technology fingerprinting (⚠️ active - requires permission)
+
+    ScanStatus:
+      type: string
+      enum:
+        - pending
+        - running
+        - completed
+        - failed
+        - partial
+      example: completed
+      description: |
+        Scan status:
+        - `pending`: Job queued but not started
+        - `running`: Job is executing
+        - `completed`: Job finished successfully
+        - `failed`: Job encountered fatal error
+        - `partial`: Job completed with some errors
+
+    # ============================================
+    # PAGINATION
+    # ============================================
+
+    PaginatedScanJobs:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScanJob"
+        total:
+          type: integer
+          example: 150
+        page:
+          type: integer
+          example: 1
+        page_size:
+          type: integer
+          example: 20
+        total_pages:
+          type: integer
+          example: 8
+
+    # ============================================
+    # ERRORS
+    # ============================================
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          example: "invalid request body"
+          description: Error message describing what went wrong

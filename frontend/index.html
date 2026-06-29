@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini ASM - Premium EASM Dashboard</title>
+    <!-- Google Fonts Outfit & Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="glow-bg"></div>
+    
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fa-solid fa-shield-halved logo-icon"></i>
+                <h2>MINI <span>ASM</span></h2>
+            </div>
+            <nav class="nav-links">
+                <a href="#" class="active"><i class="fa-solid fa-chart-pie"></i> Overview</a>
+                <a href="#assets-section"><i class="fa-solid fa-list-check"></i> Assets Management</a>
+                <a href="#scans-section"><i class="fa-solid fa-satellite-dish"></i> Scan Logs</a>
+            </nav>
+            <div class="sidebar-footer">
+                <p>Status: <span class="api-status online"><i class="fa-solid fa-circle"></i> Connected</span></p>
+                <small>EASM Engine v1.0.0</small>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="main-header">
+                <div class="header-title">
+                    <h1>EASM Dashboard</h1>
+                    <p>External Attack Surface Management & Asset Intelligence</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" id="btn-export"><i class="fa-solid fa-file-export"></i> Export CSV</button>
+                    <button class="btn btn-primary" id="btn-add-asset-modal"><i class="fa-solid fa-plus"></i> New Asset</button>
+                </div>
+            </header>
+
+            <!-- Statistics Cards -->
+            <section class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon-wrapper blue">
+                        <i class="fa-solid fa-globe"></i>
+                    </div>
+                    <div class="stat-details">
+                        <h3 id="stat-total">0</h3>
+                        <p>Total Assets</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon-wrapper purple">
+                        <i class="fa-solid fa-server"></i>
+                    </div>
+                    <div class="stat-details">
+                        <h3 id="stat-domains">0</h3>
+                        <p>Domains</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon-wrapper green">
+                        <i class="fa-solid fa-network-wired"></i>
+                    </div>
+                    <div class="stat-details">
+                        <h3 id="stat-ips">0</h3>
+                        <p>IP Addresses</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon-wrapper orange">
+                        <i class="fa-solid fa-bolt"></i>
+                    </div>
+                    <div class="stat-details">
+                        <h3 id="stat-active">0</h3>
+                        <p>Active Scans</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Filters & Search -->
+            <section class="filters-card">
+                <div class="search-bar">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="search-input" placeholder="Search assets by name...">
+                </div>
+                <div class="filter-options">
+                    <select id="filter-type">
+                        <option value="">All Types</option>
+                        <option value="domain">Domains</option>
+                        <option value="ip">IP Addresses</option>
+                        <option value="service">Services</option>
+                    </select>
+                    <select id="filter-status">
+                        <option value="">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                    <input type="text" id="filter-tag" placeholder="Filter by Tag...">
+                    <button class="btn btn-secondary" id="btn-reset-filters"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+                </div>
+            </section>
+
+            <!-- Assets Table Section -->
+            <section class="assets-section" id="assets-section">
+                <div class="section-card">
+                    <div class="card-header">
+                        <h2>Assets Inventory</h2>
+                        <div class="card-actions">
+                            <span class="pagination-info" id="pagination-info">Showing 0-0 of 0</span>
+                            <div class="pagination-controls">
+                                <button class="btn btn-icon" id="btn-prev-page" disabled><i class="fa-solid fa-chevron-left"></i></button>
+                                <button class="btn btn-icon" id="btn-next-page" disabled><i class="fa-solid fa-chevron-right"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="assets-table">
+                            <thead>
+                                <tr>
+                                    <th>Asset Name</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Tags</th>
+                                    <th>Created At</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="assets-table-body">
+                                <tr>
+                                    <td colspan="6" class="text-center py-5">
+                                        <i class="fa-solid fa-spinner fa-spin loader-icon"></i> Loading assets...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Scan Logs Section -->
+            <section class="assets-section" id="scans-section" style="display: none;">
+                <div class="section-card">
+                    <div class="card-header">
+                        <h2>Global Scan Logs</h2>
+                        <button class="btn btn-secondary" id="btn-refresh-scans"><i class="fa-solid fa-rotate"></i> Refresh Logs</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="assets-table">
+                            <thead>
+                                <tr>
+                                    <th>Job ID</th>
+                                    <th>Target Asset ID</th>
+                                    <th>Scan Type</th>
+                                    <th>Status</th>
+                                    <th>Time</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scans-table-body">
+                                <tr>
+                                    <td colspan="6" class="text-center py-5">
+                                        Loading scan logs...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal: Add Asset -->
+    <div class="modal-backdrop" id="add-asset-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add New Asset</h2>
+                <button class="close-modal" id="btn-close-add-modal">&times;</button>
+            </div>
+            <form id="add-asset-form">
+                <div class="form-group">
+                    <label for="asset-name">Asset Target (Domain or IP)</label>
+                    <input type="text" id="asset-name" placeholder="e.g., example.com, 127.0.0.1" required>
+                </div>
+                <div class="form-group">
+                    <label for="asset-type">Asset Type</label>
+                    <select id="asset-type" required>
+                        <option value="domain">Domain</option>
+                        <option value="ip">IP Address</option>
+                        <option value="service">Service</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="asset-status">Initial Status</label>
+                    <select id="asset-status">
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="asset-tags">Tags (comma separated)</label>
+                    <input type="text" id="asset-tags" placeholder="e.g., production, critical, frontend">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-add-modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Asset</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Trigger Scan -->
+    <div class="modal-backdrop" id="trigger-scan-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Trigger Attack Surface Scan</h2>
+                <button class="close-modal" id="btn-close-scan-modal">&times;</button>
+            </div>
+            <div class="asset-details-summary">
+                <p>Asset: <strong id="scan-asset-name">...</strong></p>
+                <p>Type: <span class="badge" id="scan-asset-type">...</span></p>
+            </div>
+            <div class="form-group">
+                <label for="scan-type-select">Scan Type</label>
+                <select id="scan-type-select">
+                    <!-- Options populated dynamically based on asset type -->
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="btn-cancel-scan-modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="btn-run-scan">Launch Scan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Scan Results -->
+    <div class="modal-backdrop" id="scan-results-modal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2>Scan Results & Details</h2>
+                <button class="close-modal" id="btn-close-results-modal">&times;</button>
+            </div>
+            <div class="results-metadata">
+                <div>Job ID: <span id="results-job-id">...</span></div>
+                <div>Status: <span id="results-status">...</span></div>
+                <div>Time: <span id="results-time">...</span></div>
+            </div>
+            <div class="results-body" id="results-content-area">
+                <!-- Populated dynamically via JS -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="btn-close-results-footer">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div class="toast" id="toast-notification">Notification Message</div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>

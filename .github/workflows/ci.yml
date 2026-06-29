@@ -1,0 +1,50 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, homework, homework-final ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Install Dependencies
+        run: go mod download
+
+      - name: Verify Code Build
+        run: go build -v ./cmd/server
+
+      - name: Run Unit Tests
+        run: go test -v -coverprofile=coverage.out ./...
+
+  security-scan:
+    name: Security Scan (Gosec)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24'
+
+      - name: Run Gosec Security Scan
+        uses: securego/gosec@master
+        with:
+          args: ./backend/...
