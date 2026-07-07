@@ -64,9 +64,9 @@ This project is built following **Clean Architecture** patterns:
 Create a `.env` file in the `backend/` directory or run with default environment settings.
 ```env
 DB_HOST=db
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=password
+DB_PORT=1234
+DB_USER=nttn
+DB_PASSWORD=ttnn
 DB_NAME=mini_asm
 SERVER_PORT=8080
 USE_DB=true
